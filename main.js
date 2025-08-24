@@ -59,6 +59,15 @@ class LevelScene extends Phaser.Scene {
     this.setupLayout = cfg.setupLayout || (() => {});
   }
 
+  /**
+   * Scene initialisation. Called before create(). Accepts an optional data
+   * object from Scene.start(). The goldenGun flag indicates whether the
+   * prestige mode is active where every hit converts a lead immediately.
+   */
+  init(data) {
+    this.goldenGun = data && data.goldenGun === true;
+  }
+
   create() {
     // Stage state variables
     this.converted = 0;
@@ -100,6 +109,14 @@ class LevelScene extends Phaser.Scene {
     // Player sprite. Use a simple circle for a retro look.
     this.player = this.physics.add.circle(400, 300, 10, 0xffffff);
     this.player.setCollideWorldBounds(true);
+
+    // When golden gun mode is active provide visual feedback: enlarge the
+    // player sprite and colour the morale bar gold. This helps players
+    // recognise that the prestige mode is enabled without extra UI.
+    if (this.goldenGun) {
+      this.player.setScale(1.5);
+      this.healthBar.fillColor = 0xffd700;
+    }
 
     // Groups for leads, projectiles and friction pursuers
     this.leads = this.physics.add.group();
@@ -226,6 +243,12 @@ class LevelScene extends Phaser.Scene {
   /** Handle projectile overlapping a lead. */
   handleProjectileLead(projectile, lead) {
     projectile.destroy();
+    // In golden gun mode we artificially pre‑fill the hits so that this
+    // projectile will always convert the lead on impact. Normal mode
+    // increments hitsReceived as usual.
+    if (this.goldenGun) {
+      lead.hitsReceived = lead.requiredHits - 1;
+    }
     lead.hitsReceived++;
     if (lead.hitsReceived >= lead.requiredHits) {
       this.convertLead(lead);
@@ -549,9 +572,22 @@ class Victory extends Phaser.Scene {
       fontSize: '20px',
       fill: '#cccccc',
     }).setOrigin(0.5);
+
+    // Offer a prestige mode with the infinite money gun. Press G to start
+    // a new run where every projectile converts leads instantly. This
+    // encourages players to replay for a high score.
+    this.add.text(width / 2, height / 2 + 80, 'Press G for Golden Gun run', {
+      fontSize: '18px',
+      fill: '#ffcc00',
+    }).setOrigin(0.5);
     const rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     rKey.once('down', () => {
       this.scene.start('Level1');
+    });
+
+    const gKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G);
+    gKey.once('down', () => {
+      this.scene.start('Level1', { goldenGun: true });
     });
   }
 }
